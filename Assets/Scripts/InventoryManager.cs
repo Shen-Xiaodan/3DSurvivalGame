@@ -13,11 +13,15 @@ public class InventoryManager : MonoBehaviour
 {
     public static InventoryManager Instance { get; private set; }
 
+    [SerializeField, Min(1)] private int maxSlots = 24;
+
     private readonly List<InventorySlot> slots = new List<InventorySlot>();
 
     public event Action OnInventoryChanged;
 
     public IReadOnlyList<InventorySlot> Slots => slots;
+
+    public int MaxSlots => maxSlots;
 
     private void Awake()
     {
@@ -28,6 +32,26 @@ public class InventoryManager : MonoBehaviour
         }
 
         Instance = this;
+
+        EnsureSlotCount();
+    }
+
+    private void OnValidate()
+    {
+        maxSlots = Mathf.Max(1, maxSlots);
+    }
+
+    private void EnsureSlotCount()
+    {
+        while (slots.Count < maxSlots)
+        {
+            slots.Add(new InventorySlot());
+        }
+
+        while (slots.Count > maxSlots)
+        {
+            slots.RemoveAt(slots.Count - 1);
+        }
     }
 
     public void AddItem(ItemData itemData, int amount = 1)
@@ -37,23 +61,52 @@ public class InventoryManager : MonoBehaviour
             return;
         }
 
-        InventorySlot existingSlot = slots.Find(slot => slot.itemData == itemData);
+        EnsureSlotCount();
 
-        if (existingSlot != null && itemData.stackable)
+        int remainingAmount = amount;
+
+        if (itemData.stackable)
         {
-            existingSlot.quantity += amount;
-            if (itemData.maxStack > 0)
+            for (int i = 0; i < slots.Count && remainingAmount > 0; i++)
             {
-                existingSlot.quantity = Mathf.Min(existingSlot.quantity, itemData.maxStack);
+                InventorySlot slot = slots[i];
+
+                if (slot.itemData != itemData || slot.quantity <= 0)
+                {
+                    continue;
+                }
+
+                int stackLimit = itemData.maxStack > 0 ? itemData.maxStack : int.MaxValue;
+                int spaceLeft = stackLimit - slot.quantity;
+
+                if (spaceLeft <= 0)
+                {
+                    continue;
+                }
+
+                int addAmount = Mathf.Min(spaceLeft, remainingAmount);
+                slot.quantity += addAmount;
+                remainingAmount -= addAmount;
             }
         }
-        else
+
+        while (remainingAmount > 0)
         {
-            slots.Add(new InventorySlot
+            InventorySlot emptySlot = slots.Find(slot => slot.itemData == null || slot.quantity <= 0);
+
+            if (emptySlot == null)
             {
-                itemData = itemData,
-                quantity = amount
-            });
+                Debug.LogWarning($"Inventory is full. Could not add all of {itemData.itemName}.");
+                OnInventoryChanged?.Invoke();
+                return;
+            }
+
+            int stackLimit = itemData.stackable && itemData.maxStack > 0 ? itemData.maxStack : 1;
+            int addAmount = Mathf.Min(stackLimit, remainingAmount);
+
+            emptySlot.itemData = itemData;
+            emptySlot.quantity = addAmount;
+            remainingAmount -= addAmount;
         }
 
         OnInventoryChanged?.Invoke();

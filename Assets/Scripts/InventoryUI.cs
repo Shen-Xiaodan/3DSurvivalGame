@@ -1,21 +1,26 @@
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class InventoryUI : MonoBehaviour
 {
     public GameObject inventoryPanel;
-    public TextMeshProUGUI itemListText;
+    public Transform slotContainer;
+    public InventorySlotUI slotPrefab;
+    public TextMeshProUGUI emptyText;
     public TextMeshProUGUI itemDetailText;
     public Image itemIcon;
     public KeyCode toggleKey = KeyCode.I;
-    public KeyCode nextItemKey = KeyCode.DownArrow;
-    public KeyCode previousItemKey = KeyCode.UpArrow;
+
+    [SerializeField] private bool showItemDetails = false;
+    [SerializeField, Min(1)] private int fixedColumnCount = 6;
 
     private bool isOpen;
     private int selectedIndex;
     private bool isSubscribed;
+    private bool hasLoggedMissingSlotBindings;
+    private readonly List<InventorySlotUI> slotUIs = new List<InventorySlotUI>();
 
     private void Start()
     {
@@ -23,6 +28,9 @@ public class InventoryUI : MonoBehaviour
         {
             inventoryPanel.SetActive(false);
         }
+
+        ConfigureSlotContainer();
+        SetDetailUIVisible(showItemDetails && false);
 
         TrySubscribeToInventoryEvents();
         RefreshUI();
@@ -60,70 +68,171 @@ public class InventoryUI : MonoBehaviour
 
             if (isOpen)
             {
+                ConfigureSlotContainer();
                 RefreshUI();
+                SetDetailUIVisible(showItemDetails);
             }
-        }
-
-        if (!isOpen || InventoryManager.Instance == null || InventoryManager.Instance.Slots.Count == 0)
-        {
-            return;
-        }
-
-        if (Input.GetKeyDown(nextItemKey))
-        {
-            selectedIndex = Mathf.Min(selectedIndex + 1, InventoryManager.Instance.Slots.Count - 1);
-            RefreshUI();
-        }
-
-        if (Input.GetKeyDown(previousItemKey))
-        {
-            selectedIndex = Mathf.Max(selectedIndex - 1, 0);
-            RefreshUI();
+            else
+            {
+                SetDetailUIVisible(false);
+            }
         }
     }
 
     private void RefreshUI()
     {
-        if (itemListText == null)
-        {
-            return;
-        }
-
         if (InventoryManager.Instance == null)
         {
-            itemListText.text = "Inventory manager missing";
+            if (emptyText != null)
+            {
+                emptyText.text = "Inventory manager missing";
+                emptyText.gameObject.SetActive(true);
+            }
+            ClearSlots();
             SetDetails(null, 0);
             return;
         }
 
         var slots = InventoryManager.Instance.Slots;
 
-        if (slots.Count == 0)
+        if (slotContainer == null || slotPrefab == null)
         {
-            itemListText.text = "Backpack is empty";
-            selectedIndex = 0;
+            if (emptyText != null)
+            {
+                emptyText.text = "Slot UI not configured: assign Slot Container and Slot Prefab";
+                emptyText.gameObject.SetActive(true);
+            }
+
+            ClearSlots();
             SetDetails(null, 0);
+
+            if (!hasLoggedMissingSlotBindings)
+            {
+                Debug.LogWarning("InventoryUI is missing Slot Container or Slot Prefab reference.");
+                hasLoggedMissingSlotBindings = true;
+            }
+
             return;
         }
 
-        selectedIndex = Mathf.Clamp(selectedIndex, 0, slots.Count - 1);
+        hasLoggedMissingSlotBindings = false;
 
-        StringBuilder builder = new StringBuilder();
+        if (emptyText != null)
+        {
+            bool hasAnyItem = false;
+            for (int i = 0; i < slots.Count; i++)
+            {
+                if (slots[i] != null && slots[i].itemData != null && slots[i].quantity > 0)
+                {
+                    hasAnyItem = true;
+                    break;
+                }
+            }
+
+            // emptyText.text = hasAnyItem ? string.Empty : "Backpack is empty";
+            emptyText.gameObject.SetActive(!hasAnyItem);
+        }
+
+        selectedIndex = Mathf.Clamp(selectedIndex, 0, slots.Count - 1);
+        RebuildSlots(slots);
+
+        if (showItemDetails)
+        {
+            InventorySlot selectedSlot = slots[selectedIndex];
+            if (selectedSlot != null && selectedSlot.itemData != null && selectedSlot.quantity > 0)
+            {
+                SetDetails(selectedSlot.itemData, selectedSlot.quantity);
+            }
+            else
+            {
+                SetDetails(null, 0);
+            }
+        }
+        else
+        {
+            SetDetails(null, 0);
+        }
+    }
+
+    private void RebuildSlots(IReadOnlyList<InventorySlot> slots)
+    {
+        ClearSlots();
+
         for (int i = 0; i < slots.Count; i++)
         {
             InventorySlot slot = slots[i];
-            string marker = i == selectedIndex ? "> " : "  ";
-            builder.Append(marker)
-                .Append(i + 1)
-                .Append(". ")
-                .Append(slot.itemData.itemName)
-                .Append(" x")
-                .Append(slot.quantity)
-                .Append('\n');
+            InventorySlotUI slotUI = Instantiate(slotPrefab, slotContainer);
+            int index = i;
+            slotUI.Bind(slot, i == selectedIndex, () =>
+            {
+                selectedIndex = index;
+                RefreshUI();
+            });
+            slotUIs.Add(slotUI);
+        }
+    }
+
+    private void ClearSlots()
+    {
+        for (int i = 0; i < slotUIs.Count; i++)
+        {
+            if (slotUIs[i] != null)
+            {
+                Destroy(slotUIs[i].gameObject);
+            }
         }
 
-        itemListText.text = builder.ToString();
-        SetDetails(slots[selectedIndex].itemData, slots[selectedIndex].quantity);
+        slotUIs.Clear();
+    }
+
+    private void ConfigureSlotContainer()
+    {
+        if (slotContainer == null)
+        {
+            return;
+        }
+
+        RectTransform rectTransform = slotContainer as RectTransform;
+        if (rectTransform != null)
+        {
+            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            rectTransform.anchoredPosition = Vector2.zero;
+        }
+
+        GridLayoutGroup gridLayoutGroup = slotContainer.GetComponent<GridLayoutGroup>();
+        if (gridLayoutGroup == null)
+        {
+            gridLayoutGroup = slotContainer.gameObject.AddComponent<GridLayoutGroup>();
+        }
+
+        gridLayoutGroup.childAlignment = TextAnchor.MiddleCenter;
+        gridLayoutGroup.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        gridLayoutGroup.constraintCount = Mathf.Max(1, fixedColumnCount);
+
+        if (gridLayoutGroup.cellSize == Vector2.zero)
+        {
+            gridLayoutGroup.cellSize = new Vector2(80f, 80f);
+        }
+
+        if (gridLayoutGroup.spacing == Vector2.zero)
+        {
+            gridLayoutGroup.spacing = new Vector2(8f, 8f);
+        }
+    }
+
+    private void SetDetailUIVisible(bool visible)
+    {
+        if (itemDetailText != null)
+        {
+            itemDetailText.gameObject.SetActive(visible);
+        }
+
+        if (itemIcon != null)
+        {
+            itemIcon.gameObject.SetActive(visible);
+        }
     }
 
     private void TrySubscribeToInventoryEvents()

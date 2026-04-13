@@ -1,0 +1,60 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+UserSettings/
+MemoryCaptures/
+
+# Auto-generated player/build outputs
+*.apk
+*.aab
+*.app
+*.unitypackage
+3DSurvivalGame_BurstDebugInformation_DoNotShip/
+3DSurvivalGame.app/
+
+# Asset Store and Unity cache artifacts
+Assets/AssetStoreTools*
+Assets/StreamingAssets/aa.meta
+Assets/StreamingAssets/*/aa/
+Assets/AddressableAssetsData/*/*.bin*
+
+# IDE/editor folders
+.vs/
+.vscode/
+.idea/
+.gradle/
+.consulo/
+.plastic/
+
+# Visual Studio / Rider generated files
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Optional private metadata
+*.private
+*.private.meta
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Unity synchronization temp file
+~UnityDirMonSyncFile~*

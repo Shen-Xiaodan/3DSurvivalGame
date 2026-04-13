@@ -4,22 +4,42 @@ using UnityEngine;
 
 public class InteractableObject : MonoBehaviour
 {
-    public string ItemName;
+    public ItemData itemData;
+    [Min(1)] public int pickupAmount = 1;
   
     public string GetItemName()
     {
-        return ItemName;
+        if (itemData == null)
+        {
+            return gameObject.name;
+        }
+
+        if (string.IsNullOrWhiteSpace(itemData.itemName))
+        {
+            return gameObject.name;
+        }
+
+        return itemData.itemName;
     }
 
     public void Interact()
     {
         if (InventoryManager.Instance != null)
         {
-            InventoryManager.Instance.AddItem(ItemName);
+            if (itemData != null)
+            {
+                InventoryManager.Instance.AddItem(itemData, pickupAmount);
+            }
+            else
+            {
+                Debug.LogWarning("InteractableObject has no ItemData assigned.");
+                return;
+            }
         }
         else
         {
             Debug.LogWarning("InventoryManager not found. Item cannot be added to inventory.");
+            return;
         }
 
         Destroy(gameObject);

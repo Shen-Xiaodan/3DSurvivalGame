@@ -10,8 +10,15 @@ public class InventorySlotUI : MonoBehaviour
     public Image selectionHighlight;
     public Button button;
 
+    private void Awake()
+    {
+        EnsureQuantityTextOnTop();
+    }
+
     public void Bind(InventorySlot slot, bool selected, Action onClick)
     {
+        EnsureQuantityTextOnTop();
+
         if (slot == null || slot.itemData == null)
         {
             SetEmpty();
@@ -56,6 +63,8 @@ public class InventorySlotUI : MonoBehaviour
 
     private void SetEmpty()
     {
+        EnsureQuantityTextOnTop();
+
         if (iconImage != null)
         {
             iconImage.sprite = null;
@@ -76,5 +85,16 @@ public class InventorySlotUI : MonoBehaviour
         {
             button.onClick.RemoveAllListeners();
         }
+    }
+
+    private void EnsureQuantityTextOnTop()
+    {
+        if (quantityText == null)
+        {
+            return;
+        }
+
+        // Keep stack count visible over slot icon regardless of prefab child order.
+        quantityText.transform.SetAsLastSibling();
     }
 }
